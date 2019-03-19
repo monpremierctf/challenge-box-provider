@@ -9,12 +9,7 @@ import (
 )
 
 func createNewChallengeBox(duration int) (containerID string, err error) {
-	dockerPath, err := exec.LookPath("docker")
-	if err != nil {
-		return "", err
-	}
-
-	createdContainer, err := exec.Command(dockerPath, "run", "-d", "--rm", "-p", "22", "ubuntu", "sleep", fmt.Sprintf("%d", duration)).Output()
+	createdContainer, err := exec.Command("docker", "run", "-d", "--rm", "-p", "22", "ubuntu", "sleep", fmt.Sprintf("%d", duration)).Output()
 	if err != nil {
 		return "", err
 	}
@@ -23,17 +18,31 @@ func createNewChallengeBox(duration int) (containerID string, err error) {
 	return
 }
 
+func getHostSSHPort(containerID string) (string, error) {
+	port, err := exec.Command("docker", "inspect", "-f", "{{range $p, $conf := .NetworkSettings.Ports}} {{$p}} -> {{(index $conf 0).HostPort}} {{end}}", fmt.Sprintf("%s", containerID)).Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(fmt.Sprintf("%s", port)), nil
+}
+
 func provideChallengeBox(w http.ResponseWriter, r *http.Request) {
-	boxID, err := createNewChallengeBox(60)
+	boxLifetime := 60
+	boxID, err := createNewChallengeBox(boxLifetime)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	fmt.Printf("%s\n", boxID)
+	sshPort, err := getHostSSHPort(boxID)
 
-	fmt.Fprintf(w, "Challenge box available via SSH on port %s", boxID)
+	fmt.Fprintf(w, "Challenge box available via SSH for %d seconds on port %s", boxLifetime, sshPort)
 }
 
 func main() {
+	_, err := exec.LookPath("docker")
+	if err != nil {
+		log.Fatalf("Error Docker not found : %s", err)
+	}
 
 	http.HandleFunc("/create/", provideChallengeBox)
 
