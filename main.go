@@ -192,6 +192,7 @@ func main() {
 		}
 	}()
 
+	http.Handle("/", http.FileServer(http.Dir("./static")))
 	http.HandleFunc("/create/", provideChallengeBox)
 
 	log.Fatal(http.ListenAndServe(httpServerListener, nil))
